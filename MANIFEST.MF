@@ -1,0 +1,3 @@
+Manifest-Version: 1.0
+Created-By: J.C. Huang, S. Chen  Dept.EE Tsinghua Univ.
+Main-Class: MyFrame

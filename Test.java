@@ -25,6 +25,9 @@ public class Test {
 
 		int tot_guess = 0;
 
+		int[] tot_interval = new int[1001];
+		int[] err_interval = new int[1001];
+
 		while (true) {
 			//System.out.println(wincnt + overcnt);
 			mf.init(N_ROW, N_COL, N_MINES, TYPE);
@@ -36,6 +39,8 @@ public class Test {
 					System.out.println("error");
 					mf.showBoard();
 				}
+				int cur_interval = (int) Math.round(solver.errRate * 1000);
+				tot_interval[cur_interval]++;
 				if (solver.isGuess()) {
 					n_guess++;
 //					mf.showBoard();
@@ -47,6 +52,7 @@ public class Test {
 					wincnt++;
 					break;
 				} else if (mf.getGameOver()) {
+					err_interval[cur_interval]++;
 					if (solver.n_zero < ZTHRE || solver.n_zero + solver.opened_cnt < OTHRE) {
 						//game over when initialization
 					} else {
@@ -62,9 +68,15 @@ public class Test {
 				}
 			}
 			tot_guess += n_guess;
-			if ((wincnt + overcnt) % 100 == 0)
-			System.out.println(String.format("%d\t%d\t%f\t%f\t%d", 
-				wincnt, wincnt + overcnt, wincnt * 1.0 / (wincnt + overcnt), tot_guess * 1.0 / (wincnt + overcnt), System.currentTimeMillis() - t));
+			if ((wincnt + overcnt) % 100 == 0) {
+				System.out.println(String.format("%d\t%d\t%f\t%f\t%d", 
+					wincnt, wincnt + overcnt, wincnt * 1.0 / (wincnt + overcnt), tot_guess * 1.0 / (wincnt + overcnt), System.currentTimeMillis() - t));
+				for (int i=0; i<1000; i++) {
+					if (err_interval[i] >= 10) {
+						System.out.println(i + "\t" + tot_interval[i] + "\t" + err_interval[i]);
+					}
+				}
+			}
 		}
 	}
 }

@@ -1,8 +1,15 @@
 
 import java.awt.*;
 import java.awt.event.*;
+import java.util.*;
+import javax.imageio.*;
+import java.io.*;
+import java.awt.image.*;
+import static java.awt.event.InputEvent.*;
+import java.util.jar.*;
+import javax.swing.*;
 
-public class MyFrame extends Frame {
+public class MyFrame extends JFrame {
 	
 	private int winLength;
 	private int winHeight;
@@ -10,10 +17,196 @@ public class MyFrame extends Frame {
 	private int col;
 	private int mines;
 	
-	public final static int BOX_SIZE = 20;
+	public final static int BOX_SIZE = 21;
 	
 	private Minefield mineField = new Minefield();
+	private MineBoard mineBoard = new MineBoard(mineField);
 	private Solver solver = new Solver();
+
+	private class MineBoard extends Canvas {
+		Minefield mf;
+		int r = 0;
+		int c = 0;
+
+		/**
+		 *	0: blank
+		 *	1~8: number
+		 *	9: mine
+		 *	10: flag
+		 */
+		BufferedImage[] images;
+
+		public MineBoard(Minefield mf) {
+			images = new BufferedImage[15];
+			try {
+/*				JarFile jf = new JarFile(System.getProperty("java.class.path"));
+				images[0] = ImageIO.read(jf.getInputStream(jf.getEntry("Blank.gif")));
+				images[1] = ImageIO.read(jf.getInputStream(jf.getEntry("1.gif")));
+				images[2] = ImageIO.read(jf.getInputStream(jf.getEntry("2.gif")));
+				images[3] = ImageIO.read(jf.getInputStream(jf.getEntry("3.gif")));
+				images[4] = ImageIO.read(jf.getInputStream(jf.getEntry("4.gif")));
+				images[5] = ImageIO.read(jf.getInputStream(jf.getEntry("5.gif")));
+				images[6] = ImageIO.read(jf.getInputStream(jf.getEntry("6.gif")));
+				images[7] = ImageIO.read(jf.getInputStream(jf.getEntry("7.gif")));
+				images[8] = ImageIO.read(jf.getInputStream(jf.getEntry("8.gif")));
+				images[9] = ImageIO.read(jf.getInputStream(jf.getEntry("MineOver.gif")));
+				images[10] = ImageIO.read(jf.getInputStream(jf.getEntry("Flag.gif")));
+				images[11] = ImageIO.read(jf.getInputStream(jf.getEntry("Block.gif")));
+				images[12] = ImageIO.read(jf.getInputStream(jf.getEntry("IsMine.gif")));
+				images[13] = ImageIO.read(jf.getInputStream(jf.getEntry("MarkOver.gif")));
+				for (int i=0; i<14; i++) {
+					BufferedImage newImage = new BufferedImage(BOX_SIZE, BOX_SIZE, BufferedImage.TYPE_INT_RGB);
+					Graphics g = newImage.getGraphics();
+			        g.drawImage(images[i], 0, 0, BOX_SIZE, BOX_SIZE, null);
+			        images[i] = newImage;
+				}
+*/
+				for (int i=0; i<14; i++) {
+					images[i] = new BufferedImage(BOX_SIZE, BOX_SIZE, BufferedImage.TYPE_INT_RGB);
+					Graphics g = images[i].getGraphics();
+					g.setColor(Color.WHITE);
+					g.fillRect(0, 0, BOX_SIZE, BOX_SIZE);
+					g.setColor(Color.BLACK);
+					g.drawRect(0, 0, BOX_SIZE - 1, BOX_SIZE - 1);
+				}
+				for (int i=0; i<9; i++) {
+					Graphics g = images[i].getGraphics();
+					g.setColor(Color.GRAY);
+					g.fillRect(1, 1, BOX_SIZE - 2, BOX_SIZE - 2);
+					g.setColor(Color.BLACK);
+					g.drawString(Integer.toString(i), BOX_SIZE / 2 - 3, BOX_SIZE / 2 + 5);
+				}
+				Graphics g = images[9].getGraphics();
+				g.setColor(Color.RED);
+				g.fillRect(1, 1, BOX_SIZE - 2, BOX_SIZE - 2);
+				g.setColor(Color.BLACK);
+				g.drawString(Integer.toString(9), BOX_SIZE / 2 - 3, BOX_SIZE / 2 + 5);
+
+				g = images[10].getGraphics();
+				g.setColor(Color.PINK);
+				g.fillRect(1, 1, BOX_SIZE - 2, BOX_SIZE - 2);
+				g.setColor(Color.BLACK);
+				g.drawString(Integer.toString(-1), BOX_SIZE / 2 - 5, BOX_SIZE / 2 + 5);
+
+				g = images[12].getGraphics();
+				g.setColor(Color.GRAY);
+				g.drawString(Integer.toString(9), BOX_SIZE / 2 - 3, BOX_SIZE / 2 + 5);
+
+				g = images[13].getGraphics();
+				g.setColor(Color.RED);
+				g.fillRect(1, 1, BOX_SIZE - 2, BOX_SIZE - 2);
+				g.setColor(Color.BLACK);
+				g.drawString(Integer.toString(-1), BOX_SIZE / 2 - 5, BOX_SIZE / 2 + 5);
+
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+			this.mf = mf;
+			this.r = mf.getRow();
+			this.c = mf.getCol();
+			MouseProc mouseProc = new MouseProc();
+			addMouseListener(mouseProc);
+			addMouseMotionListener(mouseProc);
+		}
+
+		public void paint(Graphics g) {
+			this.r = mf.getRow();
+			this.c = mf.getCol();
+			int[][] board = mf.getBoard();
+			int[][] mineboard = mf.getMineBoard();
+			setSize(c * BOX_SIZE, r * BOX_SIZE);
+			if (mf.getGameOver()) {
+//				System.out.println('o');
+				for (int x=0; x<r; x++) {
+					for (int y=0; y<c; y++) {
+						switch (board[x][y]) {
+						case -1: g.drawImage(mineboard[x][y] == 9 ? images[10] : images[13], 
+								y * BOX_SIZE, x * BOX_SIZE, BOX_SIZE, BOX_SIZE, null); 
+							break;
+						case -2: g.drawImage(mineboard[x][y] == 9 ? images[12] : images[11], 
+								y * BOX_SIZE, x * BOX_SIZE, BOX_SIZE, BOX_SIZE, null); 
+							break;
+						default: g.drawImage(images[board[x][y]], y * BOX_SIZE, x * BOX_SIZE, BOX_SIZE, BOX_SIZE, null); break;
+						}
+					}
+				}
+			} else {
+				for (int x=0; x<r; x++) {
+					for (int y=0; y<c; y++) {
+						switch (board[x][y]) {
+						case -1: g.drawImage(images[10], y * BOX_SIZE, x * BOX_SIZE, BOX_SIZE, BOX_SIZE, null); break;
+						case -2: /*g.drawImage(images[11], y * BOX_SIZE, x * BOX_SIZE, BOX_SIZE, BOX_SIZE, null); */break;
+						default: g.drawImage(images[board[x][y]], y * BOX_SIZE, x * BOX_SIZE, BOX_SIZE, BOX_SIZE, null); break;
+						}
+					}
+				}
+				solver.solve(mf.getBoard(), true, mines);
+				solver.calc();
+				for (int x=0; x<r; x++) {
+					for (int y=0; y<c; y++) {
+						if (board[x][y] == -2) {
+							g.drawImage(images[11], y * BOX_SIZE, x * BOX_SIZE, BOX_SIZE, BOX_SIZE, null);
+							int prob = (int)(solver.getMineProb(x, y) * (BOX_SIZE - 2) * (BOX_SIZE - 2));
+							int lines = prob / (BOX_SIZE - 2);
+							int points = prob % (BOX_SIZE - 2);
+							g.setColor(Color.PINK);
+							if (lines > 0) {
+								g.fillRect(y * BOX_SIZE + 1, x * BOX_SIZE + 1, BOX_SIZE - 2, lines);
+							}
+							if (points > 0) {
+								g.fillRect(y * BOX_SIZE + 1, x * BOX_SIZE + lines + 1, points, 1);
+							}
+						}
+					}
+				}
+
+			}
+//			g.setColor(new Color(0, 0, 0));
+//			g.fillRect(0, 0, 100, 100);	
+//			g.drawImage(images[1], 50, 50, null);
+//			System.out.println("Paint");
+		}
+
+		public void sub() {
+			paint(getGraphics());
+		}
+
+		private class MouseProc extends MouseAdapter {
+			public void mouseReleased(MouseEvent e) {
+				int y = e.getX() / BOX_SIZE;
+				int x = e.getY() / BOX_SIZE;
+				if (e.getButton() == 1 && (e.getModifiersEx() & BUTTON3_DOWN_MASK) == 0) {
+					mf.step(x, y, Minefield.LEFT_CLICK);
+					sub();
+				}
+//				System.out.println(e);
+			}
+			public void mousePressed(MouseEvent e) {
+				int y = e.getX() / BOX_SIZE;
+				int x = e.getY() / BOX_SIZE;
+				if (e.getButton() == 3 && (e.getModifiersEx() & BUTTON1_DOWN_MASK) == 0) {
+					mf.step(x, y, Minefield.RIGHT_CLICK);
+					sub();
+				}
+//				System.out.println(e);
+			}
+			public void mouseDragged(MouseEvent e) {
+				int y = e.getX() / BOX_SIZE;
+				int x = e.getY() / BOX_SIZE;
+				int keys = e.getModifiersEx();
+				if ((keys & (BUTTON1_DOWN_MASK | BUTTON3_DOWN_MASK)) == (BUTTON1_DOWN_MASK | BUTTON3_DOWN_MASK)) {
+
+				}
+			}
+			public void mouseMoved(MouseEvent e) {
+				int y = e.getX() / BOX_SIZE;
+				int x = e.getY() / BOX_SIZE;
+				if (!mf.getGameOver()) {
+					over.setText(Integer.toString((int)Math.round((solver.getMineProb(x, y) * 1000))));
+				}
+			}
+		}
+	}
 	
 	//Board
 	private class Board extends Panel {
@@ -51,18 +244,17 @@ public class MyFrame extends Frame {
 		}
 	}
 	
-	private Board[][] board;
 	private Label over = new Label("Play");
 	private Label minesLeft = new Label("");
 	private final static String MINE_LEFT = "Mines Left: ";
 	
 	//Menu
-	private MenuBar menuBar = new MenuBar();
-	private Menu menuGame = new Menu("Game");
-	private MenuItem menuGameNew = new MenuItem("New Game");
-	private MenuItem menuGameEasy = new MenuItem("Easy (9 9 10)");
-	private MenuItem menuGameNormal = new MenuItem("Normal (16 16 40)");
-	private MenuItem menuGameHard = new MenuItem("Hard (16 30 99)");
+	private JMenuBar menuBar = new JMenuBar();
+	private JMenu menuGame = new JMenu("Game");
+	private JMenuItem menuGameNew = new JMenuItem("New Game");
+	private JMenuItem menuGameEasy = new JMenuItem("Easy (9 9 10)");
+	private JMenuItem menuGameNormal = new JMenuItem("Normal (16 16 40)");
+	private JMenuItem menuGameHard = new JMenuItem("Hard (16 30 99)");
 	
 	//Settings
 	private Dialog setMineField;
@@ -80,9 +272,9 @@ public class MyFrame extends Frame {
 	private Button errorOK = new Button("  OK  ");
 	
 	//Buttons
-	private Button newGameButton = new Button("Restart");
-	private Button aiGame = new Button("AI Step");
-	private Button aiGameWithGuess = new Button("AI Guess");
+	private JButton newGameButton = new JButton("Restart");
+	private JButton aiGame = new JButton("AI Step");
+	private JButton aiGameWithGuess = new JButton("AI Guess");
 	
 	//Initial
 	MyFrame() {
@@ -90,17 +282,19 @@ public class MyFrame extends Frame {
 		setResizable(false);
 		setSize(300, 400);
 		setLayout(null);
+
+		mineField.rnd = new Random();
 		
 		addWindowListener(new winClose());
 		setMineFieldInit();
 		menuBarInit();
-		over.setSize(50, 50);
+		over.setSize(50, 30);
 		over.setFont(new Font("", 0, 15));
-		over.setLocation((winLength/2)-10, 30);
+		over.setLocation(0, 0);
 		over.setVisible(true);
 		over.setAlignment(Label.CENTER);
 		add(over);
-		minesLeft.setSize(100, 50);
+		minesLeft.setSize(150, 30);
 		minesLeft.setFont(new Font("", 0, 15));
 		add(minesLeft);
 		
@@ -110,11 +304,6 @@ public class MyFrame extends Frame {
 		
 		newGameButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				for (int i = 0; i < row; i++) {
-					for (int j = 0; j < col; j++) {
-						remove(board[i][j]);
-					}
-				}
 				over.setText("Play");
 				boardInit();
 				mineField.init(row, col, mines, Minefield.TYPE_XP);
@@ -133,7 +322,7 @@ public class MyFrame extends Frame {
 					for (int i = 0; i < actions.length; i++) {
 						mineField.step(actions[i].getX(), actions[i].getY(), actions[i].getAct());
 					}
-				} while (actions.length != 0);
+				} while (actions.length != 0 && !mineField.getGameOver());
 				refreshBoard();
 			}
 		});
@@ -150,11 +339,12 @@ public class MyFrame extends Frame {
 				refreshBoard();
 			}
 		});
-		
-		MyFrame.this.setEnabled(false);
-		setMineField.setVisible(true);
-		setMenuBar(menuBar);
+
+//		MyFrame.this.setEnabled(false);
+//		setMineField.setVisible(true);
+		setJMenuBar(menuBar);
 		setVisible(true);
+		menuGameHard.doClick();
 	}
 	
 	//Window Closing
@@ -182,11 +372,6 @@ public class MyFrame extends Frame {
 	//Refresh Board
 	private void refreshBoard() {
 		int[][] boardState = mineField.getBoard();
-		for (int i = 0; i < row; i++) {
-			for (int j = 0; j < col; j++) {
-				board[i][j].setL(boardState[i][j]);
-			}
-		}
 		if (mineField.getGameOver()) {
 			if (mineField.getWin()) {
 				over.setText("Win");
@@ -196,7 +381,8 @@ public class MyFrame extends Frame {
 			}
 		}
 		minesLeft.setText(MINE_LEFT + (mineField.getMinesLeft()));
-		revalidate();
+		mineBoard.sub();
+//		revalidate();
 	}
 	
 	//Create Menu
@@ -213,11 +399,6 @@ public class MyFrame extends Frame {
 		menuGame.add(menuGameEasy);
 		menuGameEasy.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				for (int i = 0; i < row; i++) {
-					for (int j = 0; j < col; j++) {
-						remove(board[i][j]);
-					}
-				}
 				over.setText("Play");
 				row = 9;
 				col = 9;
@@ -231,11 +412,6 @@ public class MyFrame extends Frame {
 		menuGame.add(menuGameNormal);
 		menuGameNormal.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				for (int i = 0; i < row; i++) {
-					for (int j = 0; j < col; j++) {
-						remove(board[i][j]);
-					}
-				}
 				over.setText("Play");
 				row = 16;
 				col = 16;
@@ -249,11 +425,6 @@ public class MyFrame extends Frame {
 		menuGame.add(menuGameHard);
 		menuGameHard.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				for (int i = 0; i < row; i++) {
-					for (int j = 0; j < col; j++) {
-						remove(board[i][j]);
-					}
-				}
 				over.setText("Play");
 				row = 16;
 				col = 30;
@@ -301,11 +472,6 @@ public class MyFrame extends Frame {
 					errorMsg("Too Many Mines");
 					return;
 				}
-				for (int i = 0; i < row; i++) {
-					for (int j = 0; j < col; j++) {
-						remove(board[i][j]);
-					}
-				}
 				over.setText("Play");
 				row = tempRowInt;
 				col = tempColInt;
@@ -336,28 +502,26 @@ public class MyFrame extends Frame {
 	
 	//Draw Board
 	private void boardInit() {
-		winLength = BOX_SIZE * col + 2 * (col+1) + 50 + 50;
-		winHeight = BOX_SIZE * row + 2 * (row+1) + 100 + 150;
-		over.setLocation(50, 50);
-		minesLeft.setLocation(winLength-150, 50);
+		winLength = BOX_SIZE * col + 30 + 30;
+		winHeight = BOX_SIZE * row + 50 + 100;
+		over.setLocation(30, 0);
+		minesLeft.setLocation(winLength-150, 0);
 		setSize(winLength, winHeight);
-		board = new Board[row][col];
-		for (int i = 0; i < row; i++) {
-			for (int j = 0; j < col; j++) {
-				board[i][j] = new Board(i, j);
-				board[i][j].setSize(BOX_SIZE+1, BOX_SIZE+1);
-				board[i][j].setLocation(50+(BOX_SIZE+1)*j, 100+(BOX_SIZE+1)*i);
-				//board[i][j].addMouseListener(new clicked());
-				board[i][j].setVisible(true);
-				add(board[i][j]);
-			}
-		}
-		newGameButton.setSize(70, 30);
-		newGameButton.setLocation(70, winHeight-100);
-		aiGame.setSize(70, 30);
-		aiGame.setLocation(winLength-140, winHeight-100);
-		aiGameWithGuess.setSize(70, 30);
-		aiGameWithGuess.setLocation(winLength-240, winHeight-100);
+
+		mineBoard.setSize(1, 1);
+		mineBoard.setLocation(30, 30);
+		mineBoard.setVisible(true);
+		add(mineBoard);
+		mineBoard.requestFocus();
+		newGameButton.setSize(100, 30);
+		newGameButton.setLocation(30, winHeight-100);
+		newGameButton.setMnemonic(KeyEvent.VK_1);
+		aiGame.setSize(100, 25);
+		aiGame.setLocation(winLength-130, winHeight-110);
+		aiGame.setMnemonic(KeyEvent.VK_2);
+		aiGameWithGuess.setSize(100, 25);
+		aiGameWithGuess.setLocation(winLength-130, winHeight-85);
+		aiGameWithGuess.setMnemonic(KeyEvent.VK_3);
 	}
 	
 	//Check Number
@@ -401,9 +565,5 @@ public class MyFrame extends Frame {
 
 	public static void main(String[] args) {
 		MyFrame f = new MyFrame();
-		for (int i=0; i<34; i++) {
-			f.mineField.init(16, 30, 99, Minefield.TYPE_XP);
-			f.mineField.step(0, 0, Minefield.LEFT_CLICK);
-		}
 	}
 }

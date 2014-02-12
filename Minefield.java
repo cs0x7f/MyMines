@@ -31,6 +31,7 @@ public class Minefield {
 	public int getMinesLeft() { return minesLeft; }
 	public int getBoardLeft() { return boardLeft; }
 	public int[][] getBoard() { return board; }
+	public int[][] getMineBoard() { return mineBoard; }
 	public boolean getWin() { return win; }
 	public boolean getGameOver() { return gameOver; }
 	
@@ -144,6 +145,9 @@ public class Minefield {
 	}
 	
 	public void step(int r, int c, int operate) {
+		if (gameOver) {
+			return;
+		}
 		if (operate == RIGHT_CLICK) {
 			if (board[r][c] == -2) {
 				board[r][c] = -1;
@@ -183,20 +187,7 @@ public class Minefield {
 						} catch (ArrayIndexOutOfBoundsException e) {}
 					}					
 				}
-/*				if (mineBoard[r][c] == 9) {
-					boolean flag = true;
-					while (flag) {
-						int tempPos = rnd.nextInt(col * row);
-						int mineRow = tempPos / col;
-						int mineCol = tempPos % col;
-						if (mineBoard[mineRow][mineCol] == 0) {
-							mineBoard[mineRow][mineCol] = 9;
-							flag = false;
-						}
-					}
-					mineBoard[r][c] = 0;
-				}
-*/				mineBoardInit();
+				mineBoardInit();
 //				showMineBoard();
 			}
 			if (mineBoard[r][c] == 9) {

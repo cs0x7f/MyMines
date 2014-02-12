@@ -27,25 +27,25 @@ public class Solver {
 	int h;
 	int w;
 	ArrayList<Action> ret;
-	boolean guess;
+	double errRate;
 	int n_zero;
 
 	boolean isGuess() {
-		return guess;
+		return errRate > EPS;
 	}
 
 	int unopened_cnt = 0;
 	int opened_cnt = 0;
 	int remain_mines = 0;
 
-	Action[] solve(int[][] board, boolean guess, int tot_mines) {
-		this.guess = false;
+	Action[] solve(int[][] board, boolean guess, int remain_mines) {
+		this.errRate = 0.0;
 		this.h = board.length;
 		this.w = board[0].length;
 		this.board = new int[h][w];
 		this.ret = new ArrayList<Action>();
 		this.n_zero = 0;
-		remain_mines = tot_mines;
+		this.remain_mines = remain_mines;
 		for (int i=0; i<h; i++) {
 			for (int j=0; j<w; j++) {
 				this.board[i][j] = board[i][j];
@@ -102,53 +102,31 @@ public class Solver {
 		}
 
 		if (ret.size() == 0 && guess) {
-			this.guess = true;
-			if (minval != null) {
-				return new Action[]{new Action(minval.x, minval.y, Action.LEFT_CLICK)};
+			if (minErrPoint != null) {
+				this.errRate = minErrRate;
+				return new Action[]{new Action(minErrPoint.x, minErrPoint.y, Action.LEFT_CLICK)};
 			}
-
-			//click corner first.
-			Action[] clickCorner = ClickCorner();
-			if (clickCorner != null) {
-				return clickCorner;
-			}
-
-			//then edge
+			double p_space = 0.0;
+			Point minsval = null;
 			for (int x=0; x<h; x++) {
 				for (int y=0; y<w; y++) {
-					if (x != 0 && x != h-1 && y != 0 && y != w-1) {
-						continue;
+					if (getValue(x, y) == -2 && info[x][y] == 0) {
+						double cur_p = getSpaceProb(x, y, 0xff);
+						if (cur_p >= p_space) {
+							p_space = cur_p;
+							minsval = new Point(x, y);
+						}
 					}
-					if (getValue(x, y) == -2 && info[x][y] == 0) {
-						return new Action[]{new Action(x, y, Action.LEFT_CLICK)};
-					}	
-				}
-			}			
-
-			//then center
-			for (int x=1; x<h-1; x++) {
-				for (int y=1; y<w-1; y++) {
-					if (getValue(x, y) == -2 && info[x][y] == 0) {
-						return new Action[]{new Action(x, y, Action.LEFT_CLICK)};
-					}	
 				}
 			}
+			if (minsval != null) {
+				this.errRate = p_blind;
+				return new Action[]{new Action(minsval.x, minsval.y, Action.LEFT_CLICK)};
+			}
+			System.out.println('e');
+			showBoard(board);
 		}
 		return ret.toArray(new Action[0]);
-	}
-
-	Action[] ClickCorner() {
-		if (getValue(0, 0) == -2 && info[0][0] == 0) {
-			return new Action[]{new Action(0, 0, Action.LEFT_CLICK)};
-		} else if (getValue(h-1, 0) == -2 && info[h-1][0] == 0) {
-			return new Action[]{new Action(h-1, 0, Action.LEFT_CLICK)};
-		} else if (getValue(0, w-1) == -2 && info[0][w-1] == 0) {
-			return new Action[]{new Action(0, w-1, Action.LEFT_CLICK)};
-		} else if (getValue(h-1, w-1) == -2 && info[h-1][w-1] == 0) {
-			return new Action[]{new Action(h-1, w-1, Action.LEFT_CLICK)};
-		} else {
-			return null;
-		}
 	}
 
 	void proc0() {
@@ -315,6 +293,7 @@ public class Solver {
 	int[][] info;
 	int[][] masks;
 	double[][] probability;
+	Point[][] parent;
 
 	int markinfo(int x, int y, boolean mines, ArrayList<Point> ret_mines, ArrayList<Point> ret_numbers) {
 		int val = getValue(x, y);
@@ -337,8 +316,8 @@ public class Solver {
 	}
 
 
-	double minprob = 1.0;
-	Point minval = null;
+	double minErrRate = 1.0;
+	Point minErrPoint = null;
 
 	int n_blind = 0;
 	double p_blind = 0.0;
@@ -371,12 +350,17 @@ public class Solver {
 			return;
 		}
 		masks[x1][y1] += masks[x2][y2] & 0xffffff00;
+		if (parent[x2][y2] != null) {
+			System.out.println("e_parent");
+		}
+		parent[x2][y2] = new Point(x1, y1);
 		masks[x2][y2] = 0;
 	}
 
 	void procInfo() {
 		info = new int[h][w];
 		masks = new int[h][w];
+		parent = new Point[h][w];
 		n_blind = 0;
 		for (int x=0; x<h; x++) {
 			for (int y=0; y<w; y++) {
@@ -409,8 +393,30 @@ public class Solver {
 		}
 	}
 
+	double getSpaceProb(int x, int y, int mask) {
+		double ret = 1.0 - getMineProb(x, y);
+		for (int i=0; i<8; i++) {
+			ret *= 1.0 - getMineProb(x + x_near[i], y + y_near[i]);
+		}
+		return ret;
+	}
+
+	double getMineProb(int x, int y) {
+		if (getValue(x, y) != -2) {
+			return (x < 0 || x >= h || y < 0 || y >= w) ? 0.0 : probability[x][y];
+		}
+		if (info[x][y] == 0) {
+			return p_blind;
+		}
+		if (parent[x][y] != null) {
+			probability[x][y] = getMineProb(parent[x][y].x, parent[x][y].y);
+			parent[x][y] = null;
+		}
+		return probability[x][y];
+	}
+
 	void calc() {
-		minval = null;
+		minErrPoint = null;
 		procInfo();
 		probability = new double[h][w];
 		p_blind = 0.0;
@@ -426,31 +432,51 @@ public class Solver {
 		Point[] mines = ret_mines.toArray(new Point[0]);
 		Point[] numbers = ret_numbers.toArray(new Point[0]);
 		prob_sum = 0.0;
-		guess(mines, numbers, 0, remain_mines, 1);
-		minprob = n_blind == 0 ? 1.0 : p_blind / prob_sum;
+		doSearch(mines, numbers, 0, remain_mines, 1);
+		p_blind = p_blind / prob_sum;
+		for (int x=0; x<h; x++) {
+			for (int y=0; y<w; y++) {
+				if (info[x][y] == -1) {
+					probability[x][y] /= prob_sum;
+				}
+			}
+		}		
+		minErrRate = n_blind == 0 ? 1.0 : p_blind;
+		if (p_blind < EPS || p_blind > 1.0 - EPS) {
+			for (int x=0; x<h; x++) {
+				for (int y=0; y<w; y++) {
+					if (getValue(x, y) == -2 && info[x][y] == 0) {
+						ret.add(new Action(x, y, p_blind < EPS ? Action.LEFT_CLICK : Action.RIGHT_CLICK));
+					}
+				}
+			}			
+		}
+		for (int i=0; i<ret.size(); i++) {
+			Action act = ret.get(i);
+			if (act.getAct() == Action.RIGHT_CLICK) {
+				probability[act.getX()][act.getY()] = 1.0;
+			}
+		}
 		for (int i=0; i<mines.length; i++) {
-			if ((masks[mines[i].x][mines[i].y] >> 8) == 0 || masks[mines[i].x][mines[i].y] == 0x100) {
+			if ((masks[mines[i].x][mines[i].y] >> 8) == 0) {
 				continue;
 			}
-			double curprob = probability[mines[i].x][mines[i].y] / prob_sum;
+			double curprob = probability[mines[i].x][mines[i].y];
 			if (curprob < EPS) {
 				ret.add(new Action(mines[i].x, mines[i].y, Action.LEFT_CLICK));
 			} else if (curprob > 1.0 - EPS) {
 				ret.add(new Action(mines[i].x, mines[i].y, Action.RIGHT_CLICK));
 			}
-			if (curprob < minprob) {
-				minprob = curprob;
-				minval = mines[i];
+			if (curprob < minErrRate) {
+				minErrRate = curprob;
+				minErrPoint = mines[i];
 			}
-		}
-		if (ret.size() != 0) {
-			this.guess = false;
 		}
 	}
 
 	double prob_sum = 0;
 
-	void guess(Point[] mines, Point[] numbers, int idx, int n_mines, int mult) {
+	void doSearch(Point[] mines, Point[] numbers, int idx, int n_mines, double mult) {
 		if (idx == mines.length) {
 			if (n_blind < n_mines) {
 				return;
@@ -471,7 +497,7 @@ public class Solver {
 			for (int i=0; i<=Math.min(max_mines, n_mines); i++) {
 				info[x][y] = i;
 				if (isValidMine(x, y)) {
-					guess(mines, numbers, idx + 1, n_mines - i, mult * Cnk[max_mines][i]);
+					doSearch(mines, numbers, idx + 1, n_mines - i, mult * Cnk[max_mines][i]);
 				}
 			}
 			info[x][y] = -1;
